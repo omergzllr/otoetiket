@@ -1,0 +1,28 @@
+# Sanal ortam klasörü
+venv/
+
+# Çıktı ve geçici dosyalar
+outputs/
+uploads/
+
+# Derlenmiş Python dosyaları
+__pycache__/
+*.pyc
+
+# Büyük veri ve model dosyaları
+dataset.zip
+yolo_dataset.zip
+models/*.pt
+
+# Test ve validasyon veri klasörleri (isteğe bağlı, örnek veri değilse)
+test/images/
+test/labels/
+valid/images/
+valid/labels/
+
+# IDE ve sistem dosyaları
+.DS_Store
+Thumbs.db
+
+# Git kilit dosyası
+.git/index.lock 

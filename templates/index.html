@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Model Inference & Labeling Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #1a1a1a;
+            --bg-tertiary: #2a2a2a;
+            --neon-blue: #00d4ff;
+            --neon-purple: #8b5cf6;
+            --neon-pink: #ec4899;
+            --neon-green: #10b981;
+            --neon-orange: #f59e0b;
+            --text-primary: #ffffff;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --border-color: #27272a;
+            --shadow-neon: 0 0 20px rgba(0, 212, 255, 0.3);
+            --shadow-glow: 0 0 40px rgba(0, 212, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Particle Background */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+            background: 
+                radial-gradient(circle at 25% 25%, rgba(0, 212, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(236, 72, 153, 0.05) 0%, transparent 50%);
+        }
+
+        .particle {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: var(--neon-blue);
+            border-radius: 50%;
+            animation: float-particle 6s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        .particle:nth-child(1) { left: 10%; animation-delay: 0s; }
+        .particle:nth-child(2) { left: 20%; animation-delay: 1s; }
+        .particle:nth-child(3) { left: 30%; animation-delay: 2s; }
+        .particle:nth-child(4) { left: 40%; animation-delay: 3s; }
+        .particle:nth-child(5) { left: 50%; animation-delay: 4s; }
+        .particle:nth-child(6) { left: 60%; animation-delay: 5s; }
+        .particle:nth-child(7) { left: 70%; animation-delay: 0s; }
+        .particle:nth-child(8) { left: 80%; animation-delay: 1s; }
+        .particle:nth-child(9) { left: 90%; animation-delay: 2s; }
+
+        @keyframes float-particle {
+            0%, 100% { transform: translateY(0px) scale(1); opacity: 0.3; }
+            50% { transform: translateY(-100px) scale(1.5); opacity: 1; }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 4rem 0 3rem;
+            position: relative;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--neon-blue), transparent);
+        }
+
+        .header h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 4rem;
+            font-weight: 900;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, var(--neon-blue), var(--neon-purple), var(--neon-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
+            letter-spacing: 2px;
+        }
+
+        .header p {
+            font-size: 1.3rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+            letter-spacing: 1px;
+        }
+
+        /* Cards */
+        .cyber-card {
+            background: linear-gradient(145deg, var(--bg-secondary), var(--bg-tertiary));
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .cyber-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--neon-blue), transparent);
+        }
+
+        .cyber-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, transparent, rgba(0, 212, 255, 0.05), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .cyber-card:hover {
+            transform: translateY(-10px);
+            box-shadow: var(--shadow-neon);
+            border-color: var(--neon-blue);
+        }
+
+        .cyber-card:hover::after {
+            opacity: 1;
+        }
+
+        .card-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .card-title i {
+            font-size: 1.5rem;
+            color: var(--neon-blue);
+            text-shadow: 0 0 10px var(--neon-blue);
+        }
+
+        /* Form Elements */
+        .form-label {
+            color: var(--text-primary);
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-control, .form-select {
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-primary);
+            padding: 1rem 1.25rem;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .form-control:focus, .form-select:focus {
+            background: var(--bg-primary);
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+            color: var(--text-primary);
+            outline: none;
+        }
+
+        .form-control::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* Buttons */
+        .btn-cyber {
+            background: linear-gradient(45deg, var(--neon-blue), var(--neon-purple));
+            border: none;
+            border-radius: 12px;
+            padding: 1rem 2.5rem;
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .btn-cyber::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn-cyber:hover::before {
+            left: 100%;
+        }
+
+        .btn-cyber:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(0, 212, 255, 0.3);
+            color: var(--text-primary);
+        }
+
+        .btn-success-cyber {
+            background: linear-gradient(45deg, var(--neon-green), #059669);
+        }
+
+        .btn-warning-cyber {
+            background: linear-gradient(45deg, var(--neon-orange), #d97706);
+        }
+
+        .btn-secondary-cyber {
+            background: linear-gradient(45deg, var(--neon-purple), var(--neon-pink));
+        }
+
+        .btn-danger-cyber {
+            background: linear-gradient(45deg, #ef4444, #dc2626);
+        }
+
+        /* Progress Bar */
+        .progress-cyber {
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            height: 12px;
+            overflow: hidden;
+            margin: 1.5rem 0;
+        }
+
+        .progress-bar-cyber {
+            background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple));
+            border-radius: 10px;
+            transition: width 0.6s ease;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+        }
+
+        /* Alerts */
+        .alert-cyber {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            color: var(--text-primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .alert-cyber::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--neon-blue);
+        }
+
+        .alert-success-cyber {
+            border-color: var(--neon-green);
+        }
+
+        .alert-success-cyber::before {
+            background: var(--neon-green);
+        }
+
+        .alert-danger-cyber {
+            border-color: var(--neon-pink);
+        }
+
+        .alert-danger-cyber::before {
+            background: var(--neon-pink);
+        }
+
+        /* Results Section */
+        .results-cyber {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2.5rem;
+            margin-top: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .results-cyber::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--neon-blue), transparent);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+
+        .stat-card-cyber {
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card-cyber::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple));
+        }
+
+        .stat-card-cyber:hover {
+            transform: translateY(-5px);
+            border-color: var(--neon-blue);
+            box-shadow: var(--shadow-neon);
+        }
+
+        .stat-number {
+            font-family: 'Orbitron', monospace;
+            font-size: 3rem;
+            font-weight: 900;
+            color: var(--neon-blue);
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Download Buttons */
+        .download-btn-cyber {
+            background: linear-gradient(45deg, var(--neon-green), #059669);
+            color: var(--text-primary);
+            text-decoration: none;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+            font-family: 'Orbitron', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .download-btn-cyber:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(16, 185, 129, 0.3);
+            color: var(--text-primary);
+            border-color: var(--neon-green);
+        }
+
+        /* Floating Action */
+        .floating-action-cyber {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 1000;
+        }
+
+        .fab-cyber {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, var(--neon-blue), var(--neon-purple));
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            box-shadow: var(--shadow-neon);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .fab-cyber:hover {
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 20px 40px rgba(0, 212, 255, 0.4);
+        }
+
+        /* Loading Spinner */
+        .loading-spinner-cyber {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(0, 212, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--neon-blue);
+            animation: spin-cyber 1s ease-in-out infinite;
+        }
+
+        @keyframes spin-cyber {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Animations */
+        .fade-in-cyber {
+            animation: fadeInCyber 0.8s ease-out;
+        }
+
+        @keyframes fadeInCyber {
+            from { 
+                opacity: 0; 
+                transform: translateY(30px); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0); 
+            }
+        }
+
+        .glow-text {
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2.5rem;
+            }
+            
+            .cyber-card {
+                padding: 1.5rem;
+                margin-bottom: 1.5rem;
+            }
+            
+            .card-title {
+                font-size: 1.5rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .btn-cyber {
+                padding: 0.875rem 1.5rem;
+                font-size: 0.9rem;
+            }
+        }
+
+        /* Checkbox Styling */
+        .form-check-input {
+            background-color: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+        }
+
+        .form-check-input:checked {
+            background-color: var(--neon-blue);
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .form-check-label {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* Ensure all interactive elements are clickable */
+        .form-control, .form-select, .btn-cyber, .download-btn-cyber, .fab-cyber {
+            position: relative;
+            z-index: 10;
+            pointer-events: auto;
+        }
+
+        /* Make sure form elements inside cards are clickable */
+        .cyber-card .form-control,
+        .cyber-card .form-select,
+        .cyber-card .btn-cyber,
+        .cyber-card .download-btn-cyber {
+            position: relative;
+            z-index: 15;
+        }
+
+        /* Ensure checkboxes are clickable */
+        .form-check-input {
+            position: relative;
+            z-index: 15;
+            pointer-events: auto;
+        }
+
+        /* Enhanced Statistics Styling */
+        .stat-item {
+            text-align: center;
+            padding: 1rem;
+            background: linear-gradient(145deg, var(--bg-primary), var(--bg-secondary));
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .stat-item:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-neon);
+            border-color: var(--neon-blue);
+        }
+
+        .stat-value {
+            display: block;
+            font-size: 2rem;
+            font-weight: 900;
+            font-family: 'Orbitron', monospace;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .stat-item .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .text-success {
+            color: var(--neon-green) !important;
+        }
+
+        .text-warning {
+            color: var(--neon-orange) !important;
+        }
+
+        .text-danger {
+            color: #ef4444 !important;
+        }
+
+        .text-muted {
+            color: var(--text-muted) !important;
+        }
+
+        /* File Management Styling */
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .file-item:hover {
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            flex: 1;
+            margin-right: 1rem;
+        }
+
+        .file-size {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-right: 1rem;
+            min-width: 80px;
+            text-align: right;
+        }
+
+        /* Modal Styling */
+        .cyber-modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 15px;
+        }
+
+        .cyber-modal .modal-header {
+            border-bottom: 1px solid var(--border-color);
+            background: linear-gradient(145deg, var(--bg-secondary), var(--bg-tertiary));
+        }
+
+        .cyber-modal .modal-body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .cyber-modal .modal-footer {
+            border-top: 1px solid var(--border-color);
+            background: linear-gradient(145deg, var(--bg-secondary), var(--bg-tertiary));
+        }
+
+        /* File Preview Styling */
+        .file-preview-content {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .preview-line {
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+            white-space: pre-wrap;
+        }
+
+        /* Button Variants */
+        .btn-info-cyber {
+            background: linear-gradient(45deg, var(--neon-blue), #0284c7);
+            border: 2px solid var(--neon-blue);
+            color: var(--text-primary);
+        }
+
+        .btn-info-cyber:hover {
+            background: linear-gradient(45deg, #0284c7, var(--neon-blue));
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+            color: var(--text-primary);
+        }
+
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        /* Alert Styling */
+        .alert-info-cyber {
+            background: linear-gradient(145deg, rgba(0, 212, 255, 0.1), rgba(0, 212, 255, 0.05));
+            border: 1px solid var(--neon-blue);
+            color: var(--neon-blue);
+        }
+
+        .alert-error-cyber {
+            background: linear-gradient(145deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));
+            border: 1px solid #ef4444;
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <!-- Particle Background -->
+    <div class="particles">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
+    
+    <div class="container">
+        <div class="header fade-in-cyber">
+            <h1><i class="fas fa-brain glow-text"></i> AI MODEL INFERENCE</h1>
+            <p>Advanced AI Model Inference and Labeling Tool</p>
+        </div>
+
+        <form method="POST" enctype="multipart/form-data" class="fade-in-cyber">
+            <!-- Model Upload Section -->
+            <div class="cyber-card">
+                <h3 class="card-title">
+                    <i class="fas fa-upload"></i>
+                    Model Upload
+                </h3>
+                <div class="row">
+                    <div class="col-md-6">
+                        <label for="model_file" class="form-label">AI Model File</label>
+                        <input type="file" class="form-control" id="model_file" name="model_file" accept=".pt,.pth,.onnx,.pb" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="model_type" class="form-label">Model Type</label>
+                        <select class="form-select" id="model_type" name="model_type">
+                            <option value="auto">Auto Detect</option>
+                            <option value="yolo">YOLOv5/v8</option>
+                            <option value="detectron2">Detectron2</option>
+                            <option value="sam">Segment Anything Model (SAM)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Upload Section -->
+            <div class="cyber-card">
+                <h3 class="card-title">
+                    <i class="fas fa-images"></i>
+                    Data Upload
+                </h3>
+                <div class="row">
+                    <div class="col-md-6">
+                        <label for="data_file" class="form-label">Image Data (ZIP/Individual Files)</label>
+                        <input type="file" class="form-control" id="data_file" name="data_file" accept=".zip,.jpg,.jpeg,.png,.bmp" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="label_name" class="form-label">Label Name (Optional)</label>
+                        <input type="text" class="form-control" id="label_name" name="label_name" placeholder="e.g., person, car, defect">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Processing Options -->
+            <div class="cyber-card">
+                <h3 class="card-title">
+                    <i class="fas fa-cogs"></i>
+                    Processing Options
+                </h3>
+                <div class="row">
+                    <div class="col-md-3">
+                        <label for="confidence_threshold" class="form-label">Confidence Threshold</label>
+                        <input type="number" class="form-control" id="confidence_threshold" name="confidence_threshold" 
+                               value="0.5" min="0.0" max="1.0" step="0.1">
+                        <small class="text-muted">Higher = fewer but more confident detections</small>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="augmentation_count" class="form-label">Augmentation Count</label>
+                        <input type="number" class="form-control" id="augmentation_count" name="augmentation_count" 
+                               value="3" min="0" max="10">
+                        <small class="text-muted">Number of augmented images per original</small>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check mt-4">
+                            <input class="form-check-input" type="checkbox" id="do_augmentation" name="do_augmentation" checked>
+                            <label class="form-check-label" for="do_augmentation">
+                                Enable Data Augmentation
+                            </label>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="auto_optimize" name="auto_optimize">
+                            <label class="form-check-label" for="auto_optimize">
+                                Auto-Optimize Confidence Threshold
+                            </label>
+                            <small class="text-muted d-block">Automatically find best threshold for your images</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="text-center mb-4">
+                <button type="submit" class="btn btn-cyber btn-success-cyber me-3">
+                    <i class="fas fa-play"></i> Start Processing
+                </button>
+                <button type="button" class="btn btn-cyber btn-secondary-cyber me-3" onclick="validateLabels()">
+                    <i class="fas fa-check-circle"></i> Validate Labels
+                </button>
+                <button type="button" class="btn btn-cyber btn-warning-cyber me-3" onclick="exportReport()">
+                    <i class="fas fa-download"></i> Export Report
+                </button>
+                <button type="button" class="btn btn-cyber btn-danger-cyber me-3" onclick="clearSession()">
+                    <i class="fas fa-trash"></i> Clear Session
+                </button>
+            </div>
+        </form>
+
+        <!-- Clear Session Form (Hidden) -->
+        <form id="clearSessionForm" method="POST" action="{{ url_for('clear_session') }}" style="display: none;">
+        </form>
+
+        <!-- Progress Section -->
+        {% if processing %}
+        <div class="cyber-card">
+            <h3 class="card-title">
+                <i class="fas fa-spinner fa-spin"></i>
+                Processing...
+            </h3>
+            <div class="progress-cyber">
+                <div class="progress-bar-cyber" role="progressbar" style="width: 75%"></div>
+            </div>
+            <p class="text-center mt-3" style="color: var(--text-secondary);">Processing images and generating labels...</p>
+        </div>
+        {% endif %}
+
+        <!-- Results Section -->
+        {% if results %}
+        <div class="results-cyber fade-in-cyber">
+            <h3 class="card-title">
+                <i class="fas fa-chart-bar"></i>
+                Processing Results
+            </h3>
+            
+            <!-- Statistics -->
+            <div class="stats-grid">
+                <div class="stat-card-cyber">
+                    <div class="stat-number">{{ results.total_images }}</div>
+                    <div class="stat-label">Total Images</div>
+                </div>
+                <div class="stat-card-cyber">
+                    <div class="stat-number">{{ results.processed_images }}</div>
+                    <div class="stat-label">Processed</div>
+                </div>
+                <div class="stat-card-cyber">
+                    <div class="stat-number">{{ results.total_objects }}</div>
+                    <div class="stat-label">Objects Detected</div>
+                </div>
+                <div class="stat-card-cyber">
+                    <div class="stat-number">{{ "%.2f"|format(results.avg_confidence) }}</div>
+                    <div class="stat-label">Avg Confidence</div>
+                </div>
+            </div>
+
+            <!-- Enhanced Statistics -->
+            {% if results.detection_stats %}
+            <div class="cyber-card mt-4">
+                <h5 class="text-white mb-3">
+                    <i class="fas fa-chart-pie"></i> Detection Quality Analysis
+                </h5>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="stat-item">
+                            <span class="stat-value text-success">{{ results.detection_stats.high_confidence }}</span>
+                            <span class="stat-label">High Confidence (>80%)</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-item">
+                            <span class="stat-value text-warning">{{ results.detection_stats.medium_confidence }}</span>
+                            <span class="stat-label">Medium Confidence (50-80%)</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-item">
+                            <span class="stat-value text-danger">{{ results.detection_stats.low_confidence }}</span>
+                            <span class="stat-label">Low Confidence (<50%)</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-item">
+                            <span class="stat-value text-muted">{{ results.detection_stats.no_detections }}</span>
+                            <span class="stat-label">No Detections</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Performance Results -->
+            {% if results.performance_results %}
+            <div class="cyber-card mt-4">
+                <h5 class="text-white mb-3">
+                    <i class="fas fa-tachometer-alt"></i> Model Performance Test
+                </h5>
+                <div class="row">
+                    {% for threshold, detections in results.performance_results.items() %}
+                    <div class="col-md-3">
+                        <div class="stat-item">
+                            <span class="stat-value">{{ detections }}</span>
+                            <span class="stat-label">Confidence {{ threshold.replace('conf_', '') }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Processing Info -->
+            <div class="cyber-card mt-4">
+                <h5 class="text-white mb-3">
+                    <i class="fas fa-info-circle"></i> Processing Information
+                </h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Final Confidence Threshold:</strong> {{ "%.2f"|format(results.confidence_threshold) }}</p>
+                        {% if results.total_augmented > 0 %}
+                        <p><strong>Augmented Images Created:</strong> {{ results.total_augmented }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Detection Rate:</strong> {{ "%.1f"|format((results.total_objects / results.processed_images) if results.processed_images > 0 else 0) }} objects per image</p>
+                        <p><strong>Success Rate:</strong> {{ "%.1f"|format((results.processed_images / results.total_images * 100) if results.total_images > 0 else 0) }}%</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Download Links -->
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="cyber-card">
+                        <h5 class="text-white mb-3">
+                            <i class="fas fa-file-image"></i> Original Labels
+                        </h5>
+                        <a href="{{ url_for('download_file', filename='original_labels.zip') }}" class="download-btn-cyber">
+                            <i class="fas fa-download"></i> Download Original Labels
+                        </a>
+                    </div>
+                </div>
+                {% if results.total_augmented > 0 %}
+                <div class="col-md-4">
+                    <div class="cyber-card">
+                        <h5 class="text-white mb-3">
+                            <i class="fas fa-magic"></i> Augmented Images
+                        </h5>
+                        <a href="{{ url_for('download_file', filename='augmented_images.zip') }}" class="download-btn-cyber">
+                            <i class="fas fa-download"></i> Download Augmented Images
+                        </a>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="cyber-card">
+                        <h5 class="text-white mb-3">
+                            <i class="fas fa-tags"></i> Augmented Labels
+                        </h5>
+                        <a href="{{ url_for('download_file', filename='augmented_labels.zip') }}" class="download-btn-cyber">
+                            <i class="fas fa-download"></i> Download Augmented Labels
+                        </a>
+                    </div>
+                </div>
+                {% else %}
+                <div class="col-md-4">
+                    <div class="cyber-card">
+                        <h5 class="text-white mb-3">
+                            <i class="fas fa-info-circle"></i> Info
+                        </h5>
+                        <p class="text-muted">Enable augmentation to get more download options</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="cyber-card">
+                        <h5 class="text-white mb-3">
+                            <i class="fas fa-chart-line"></i> Statistics
+                        </h5>
+                        <p class="text-muted">Processed {{ results.processed_images }} images</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- YOLO Dataset Export Section -->
+            <div class="cyber-card mt-4 fade-in-cyber">
+                <h3 class="card-title">
+                    <i class="fas fa-project-diagram"></i> Create & Export YOLO Dataset
+                </h3>
+                <p class="text-secondary mb-4">
+                    Split the processed images and labels into training, validation, and test sets. Adjust the sliders to define the ratio for each set. The total must be 100%.
+                </p>
+                <div class="row align-items-center">
+                    <!-- Train Slider -->
+                    <div class="col-md-3">
+                        <label for="train-split" class="form-label">Train: <span id="train-value">70</span>%</label>
+                        <input type="range" class="form-range" id="train-split" min="0" max="100" value="70">
+                    </div>
+                    <!-- Validation Slider -->
+                    <div class="col-md-3">
+                        <label for="valid-split" class="form-label">Validation: <span id="valid-value">10</span>%</label>
+                        <input type="range" class="form-range" id="valid-split" min="0" max="100" value="10">
+                    </div>
+                    <!-- Test Slider -->
+                    <div class="col-md-3">
+                        <label for="test-split" class="form-label">Test: <span id="test-value">20</span>%</label>
+                        <input type="range" class="form-range" id="test-split" min="0" max="100" value="20">
+                    </div>
+                    <!-- Download Button -->
+                    <div class="col-md-3 text-end">
+                        <button class="btn btn-cyber btn-success-cyber w-100" onclick="generateYoloDataset()">
+                            <i class="fas fa-download"></i> Generate & Download
+                        </button>
+                    </div>
+                </div>
+                <div id="split-error" class="text-danger mt-3" style="display: none;">Total split must be 100%.</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- File Management Section -->
+        <div class="cyber-card fade-in-cyber">
+            <h3 class="card-title">
+                <i class="fas fa-folder-open"></i>
+                File Management & Statistics
+            </h3>
+            
+            <!-- Action Buttons -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <button type="button" class="btn btn-cyber btn-info-cyber w-100" onclick="loadFileList()">
+                        <i class="fas fa-list"></i> List Files
+                    </button>
+                </div>
+                <div class="col-md-3">
+                    <button type="button" class="btn btn-cyber btn-success-cyber w-100" onclick="loadStatistics()">
+                        <i class="fas fa-chart-bar"></i> View Statistics
+                    </button>
+                </div>
+                <div class="col-md-3">
+                    <button type="button" class="btn btn-cyber btn-warning-cyber w-100" onclick="downloadAllFiles()">
+                        <i class="fas fa-download"></i> Download All
+                    </button>
+                </div>
+                <div class="col-md-3">
+                    <button type="button" class="btn btn-cyber btn-secondary-cyber w-100" onclick="refreshData()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- File List Display -->
+            <div id="fileListContainer" style="display: none;">
+                <h5 class="text-white mb-3">
+                    <i class="fas fa-files-o"></i> Available Files
+                </h5>
+                <div id="fileListContent"></div>
+            </div>
+
+            <!-- Statistics Display -->
+            <div id="statisticsContainer" style="display: none;">
+                <h5 class="text-white mb-3">
+                    <i class="fas fa-chart-pie"></i> Detailed Statistics
+                </h5>
+                <div id="statisticsContent"></div>
+            </div>
+
+            <!-- File Preview Modal -->
+            <div class="modal fade" id="filePreviewModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content cyber-modal">
+                        <div class="modal-header">
+                            <h5 class="modal-title text-white">
+                                <i class="fas fa-eye"></i> File Preview
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="filePreviewContent"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-cyber btn-secondary-cyber" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-cyber btn-success-cyber" id="downloadPreviewFile">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        {% if messages %}
+        <div class="fade-in-cyber">
+            {% for message in messages %}
+            <div class="alert-cyber alert-{{ message.type }}-cyber">
+                <i class="fas fa-{{ 'check-circle' if message.type == 'success' else 'exclamation-triangle' }}"></i>
+                {{ message.text }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Floating Action Button -->
+    <div class="floating-action-cyber">
+        <button class="fab-cyber" onclick="scrollToTop()" title="Scroll to Top">
+            <i class="fas fa-arrow-up"></i>
+        </button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function validateLabels() {
+            alert('Label validation feature coming soon!');
+        }
+
+        function exportReport() {
+            alert('Report export feature coming soon!');
+        }
+
+        function clearSession() {
+            if (confirm('Are you sure you want to clear the session? This will remove all stored data and results.')) {
+                document.getElementById('clearSessionForm').submit();
+            }
+        }
+
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // File Management Functions
+        function loadFileList() {
+            fetch('/list_files')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        showAlert('error', data.error);
+                        return;
+                    }
+                    
+                    displayFileList(data);
+                    document.getElementById('fileListContainer').style.display = 'block';
+                    document.getElementById('statisticsContainer').style.display = 'none';
+                })
+                .catch(error => {
+                    showAlert('error', 'Error loading file list: ' + error.message);
+                });
+        }
+
+        function displayFileList(files) {
+            const container = document.getElementById('fileListContent');
+            let html = '';
+            
+            // ZIP Files
+            if (files.zip_files && files.zip_files.length > 0) {
+                html += '<div class="cyber-card mb-3"><h6 class="text-white mb-3"><i class="fas fa-file-archive"></i> ZIP Archives</h6>';
+                files.zip_files.forEach(file => {
+                    html += `<div class="file-item">
+                        <span class="file-name">${file.name}</span>
+                        <span class="file-size">${file.size_mb} MB</span>
+                        <button class="btn btn-cyber btn-sm btn-success-cyber" onclick="downloadFile('${file.name}')">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+            
+            // Original Labels
+            if (files.original_labels && files.original_labels.length > 0) {
+                html += '<div class="cyber-card mb-3"><h6 class="text-white mb-3"><i class="fas fa-tags"></i> Original Labels</h6>';
+                files.original_labels.forEach(file => {
+                    html += `<div class="file-item">
+                        <span class="file-name">${file.name}</span>
+                        <span class="file-size">${file.size_mb} MB</span>
+                        <button class="btn btn-cyber btn-sm btn-info-cyber me-2" onclick="previewFile('original_labels', '${file.name}')">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                        <button class="btn btn-cyber btn-sm btn-success-cyber" onclick="downloadIndividualFile('original_labels', '${file.name}')">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+            
+            // Augmented Labels
+            if (files.augmented_labels && files.augmented_labels.length > 0) {
+                html += '<div class="cyber-card mb-3"><h6 class="text-white mb-3"><i class="fas fa-magic"></i> Augmented Labels</h6>';
+                files.augmented_labels.forEach(file => {
+                    html += `<div class="file-item">
+                        <span class="file-name">${file.name}</span>
+                        <span class="file-size">${file.size_mb} MB</span>
+                        <button class="btn btn-cyber btn-sm btn-info-cyber me-2" onclick="previewFile('augmented_labels', '${file.name}')">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                        <button class="btn btn-cyber btn-sm btn-success-cyber" onclick="downloadIndividualFile('augmented_labels', '${file.name}')">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+            
+            // Augmented Images
+            if (files.augmented_images && files.augmented_images.length > 0) {
+                html += '<div class="cyber-card mb-3"><h6 class="text-white mb-3"><i class="fas fa-images"></i> Augmented Images</h6>';
+                files.augmented_images.forEach(file => {
+                    html += `<div class="file-item">
+                        <span class="file-name">${file.name}</span>
+                        <span class="file-size">${file.size_mb} MB</span>
+                        <button class="btn btn-cyber btn-sm btn-success-cyber" onclick="downloadIndividualFile('augmented_images', '${file.name}')">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+            
+            if (html === '') {
+                html = '<div class="alert-cyber alert-info-cyber">No files available. Please process some images first.</div>';
+            }
+            
+            container.innerHTML = html;
+        }
+
+        function loadStatistics() {
+            fetch('/statistics')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        showAlert('error', data.error);
+                        return;
+                    }
+                    
+                    displayStatistics(data);
+                    document.getElementById('statisticsContainer').style.display = 'block';
+                    document.getElementById('fileListContainer').style.display = 'none';
+                })
+                .catch(error => {
+                    showAlert('error', 'Error loading statistics: ' + error.message);
+                });
+        }
+
+        function displayStatistics(stats) {
+            const container = document.getElementById('statisticsContent');
+            let html = '';
+            
+            // File Counts
+            html += '<div class="cyber-card mb-3"><h6 class="text-white mb-3"><i class="fas fa-files-o"></i> File Counts</h6>';
+            html += '<div class="row">';
+            Object.entries(stats.file_counts || {}).forEach(([type, count]) => {
+                html += `<div class="col-md-3">
+                    <div class="stat-item">
+                        <span class="stat-value">${count}</span>
+                        <span class="stat-label">${type.replace('_', ' ').toUpperCase()}</span>
+                    </div>
+                </div>`;
+            });
+            html += '</div></div>';
+            
+            // Total Sizes
+            if (stats.total_sizes) {
+                html += '<div class="cyber-card mb-3"><h6 class="text-white mb-3"><i class="fas fa-hdd"></i> Total Sizes</h6>';
+                html += '<div class="row">';
+                Object.entries(stats.total_sizes).forEach(([type, size]) => {
+                    html += `<div class="col-md-3">
+                        <div class="stat-item">
+                            <span class="stat-value">${size.mb} MB</span>
+                            <span class="stat-label">${type.replace('_', ' ').toUpperCase()}</span>
+                        </div>
+                    </div>`;
+                });
+                html += '</div></div>';
+            }
+            
+            // Processing Summary
+            if (stats.processing_summary && Object.keys(stats.processing_summary).length > 0) {
+                html += '<div class="cyber-card mb-3"><h6 class="text-white mb-3"><i class="fas fa-chart-line"></i> Processing Summary</h6>';
+                html += '<div class="row">';
+                Object.entries(stats.processing_summary).forEach(([key, value]) => {
+                    if (typeof value === 'number') {
+                        html += `<div class="col-md-3">
+                            <div class="stat-item">
+                                <span class="stat-value">${value}</span>
+                                <span class="stat-label">${key.replace('_', ' ').toUpperCase()}</span>
+                            </div>
+                        </div>`;
+                    }
+                });
+                html += '</div></div>';
+            }
+            
+            container.innerHTML = html;
+        }
+
+        function downloadFile(filename) {
+            window.location.href = `/download/${filename}`;
+        }
+
+        function downloadIndividualFile(fileType, filename) {
+            window.location.href = `/download_individual/${fileType}/${filename}`;
+        }
+
+        function downloadAllFiles() {
+            window.location.href = '/download_all';
+        }
+
+        function previewFile(fileType, filename) {
+            fetch(`/preview_file/${fileType}/${filename}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        showAlert('error', data.error);
+                        return;
+                    }
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('filePreviewModal'));
+                    const content = document.getElementById('filePreviewContent');
+                    
+                    let html = `<h6 class="text-white mb-3">${data.filename}</h6>`;
+                    html += `<p class="text-muted">Size: ${data.file_size} bytes | Lines: ${data.total_lines}</p>`;
+                    html += '<div class="file-preview-content">';
+                    data.preview.forEach(line => {
+                        html += `<div class="preview-line">${line}</div>`;
+                    });
+                    html += '</div>';
+                    
+                    content.innerHTML = html;
+                    
+                    // Set download button
+                    document.getElementById('downloadPreviewFile').onclick = () => {
+                        downloadIndividualFile(fileType, filename);
+                    };
+                    
+                    modal.show();
+                })
+                .catch(error => {
+                    showAlert('error', 'Error previewing file: ' + error.message);
+                });
+        }
+
+        function refreshData() {
+            loadFileList();
+            loadStatistics();
+        }
+
+        function showAlert(type, message) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert-cyber alert-${type}-cyber fade-in-cyber`;
+            alertDiv.innerHTML = `<i class="fas fa-${type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i> ${message}`;
+            
+            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').firstChild);
+            
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+
+        // Add loading state to submit button
+        document.querySelector('form').addEventListener('submit', function() {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            submitBtn.innerHTML = '<span class="loading-spinner-cyber"></span> Processing...';
+            submitBtn.disabled = true;
+        });
+
+        // Animate elements on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('fade-in-cyber');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.cyber-card, .stat-card-cyber').forEach(el => {
+            observer.observe(el);
+        });
+
+        // Add particle animation
+        function createParticle() {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.animationDelay = Math.random() * 6 + 's';
+            particle.style.pointerEvents = 'none';
+            document.querySelector('.particles').appendChild(particle);
+            
+            setTimeout(() => {
+                particle.remove();
+            }, 6000);
+        }
+
+        setInterval(createParticle, 2000);
+
+        const trainSlider = document.getElementById('train-split');
+        const validSlider = document.getElementById('valid-split');
+        const testSlider = document.getElementById('test-split');
+        const trainValue = document.getElementById('train-value');
+        const validValue = document.getElementById('valid-value');
+        const testValue = document.getElementById('test-value');
+        const splitError = document.getElementById('split-error');
+
+        function updateSplitValues() {
+            if (!trainSlider) return; // Only run if sliders are on the page
+
+            const sliders = { train: trainSlider, valid: validSlider, test: testSlider };
+            const values = { train: trainValue, valid: validValue, test: testValue };
+            
+            let total = parseInt(trainSlider.value) + parseInt(validSlider.value) + parseInt(testSlider.value);
+            
+            // Update labels
+            trainValue.textContent = trainSlider.value;
+            validValue.textContent = validSlider.value;
+            testValue.textContent = testSlider.value;
+
+            // Check if total is 100
+            if (total !== 100) {
+                splitError.style.display = 'block';
+                splitError.textContent = `Total split must be 100%. Current total: ${total}%`;
+            } else {
+                splitError.style.display = 'none';
+            }
+        }
+
+        if(trainSlider) {
+            ['input', 'change'].forEach(evt => {
+                trainSlider.addEventListener(evt, updateSplitValues);
+                validSlider.addEventListener(evt, updateSplitValues);
+                testSlider.addEventListener(evt, updateSplitValues);
+            });
+            document.addEventListener('DOMContentLoaded', updateSplitValues);
+        }
+        
+        function generateYoloDataset() {
+            const train = trainSlider.value;
+            const valid = validSlider.value;
+            const test = testSlider.value;
+
+            if (parseInt(train) + parseInt(valid) + parseInt(test) !== 100) {
+                showAlert('error', 'Split percentages must add up to 100.');
+                return;
+            }
+
+            showAlert('info', 'Generating YOLO dataset... This may take a moment.');
+
+            fetch('/create_split_dataset', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ train, valid, test })
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.blob().then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = 'yolo_dataset.zip';
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        showAlert('success', 'Dataset ZIP file downloaded successfully!');
+                    });
+                } else {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.error || 'Unknown error occurred.');
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error generating dataset:', error);
+                showAlert('error', `Failed to generate dataset: ${error.message}`);
+            });
+        }
+    </script>
+</body>
+</html> 
