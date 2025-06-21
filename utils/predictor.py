@@ -1,6 +1,7 @@
 import os
 import cv2
 import numpy as np
+import json
 from pathlib import Path
 from typing import List, Dict, Union, Tuple
 
@@ -34,6 +35,126 @@ class Predictor:
             return self._predict_sam(image)
         else:
             raise ValueError(f"Unsupported model type: {self.model_type}")
+    
+    def predict_image_with_augmentation_correction(self, 
+                                                 image_path: Union[str, Path],
+                                                 metadata_path: Union[str, Path] = None) -> Dict:
+        """
+        Predict on an image and correct coordinates if it's an augmented image
+        Returns: Dict with predictions and metadata
+        """
+        image_path = Path(image_path)
+        
+        # Get predictions
+        predictions = self.predict_image(image_path)
+        
+        # Check if this is an augmented image and load metadata
+        if metadata_path and Path(metadata_path).exists():
+            try:
+                with open(metadata_path, 'r') as f:
+                    metadata = json.load(f)
+                
+                # Apply coordinate transformations based on augmentation metadata
+                if predictions['type'] in ['detection', 'instance_segmentation'] and len(predictions['boxes']) > 0:
+                    predictions['boxes'] = self._apply_augmentation_corrections(
+                        predictions['boxes'], metadata
+                    )
+                    print(f"Applied augmentation corrections to {len(predictions['boxes'])} boxes")
+                    
+            except Exception as e:
+                print(f"Warning: Could not apply augmentation corrections: {e}")
+        
+        return predictions
+    
+    def _apply_augmentation_corrections(self, boxes: np.ndarray, metadata: Dict) -> np.ndarray:
+        """Apply coordinate corrections based on augmentation metadata"""
+        if not boxes.size:
+            return boxes
+        
+        # Convert boxes from absolute coordinates to normalized YOLO format first
+        # Assuming boxes are in [x1, y1, x2, y2] format
+        original_shape = metadata.get('original_shape', [480, 640, 3])
+        final_shape = metadata.get('final_shape', [480, 640, 3])
+        
+        orig_height, orig_width = original_shape[:2]
+        final_height, final_width = final_shape[:2]
+        
+        # Convert to YOLO format
+        yolo_boxes = []
+        for box in boxes:
+            x1, y1, x2, y2 = box
+            x_center = (x1 + x2) / 2 / final_width
+            y_center = (y1 + y2) / 2 / final_height
+            width = (x2 - x1) / final_width
+            height = (y2 - y1) / final_height
+            yolo_boxes.append([x_center, y_center, width, height])
+        
+        yolo_boxes = np.array(yolo_boxes)
+        
+        # Apply transformations in reverse order
+        for transform_info in reversed(metadata.get('applied_transforms', [])):
+            transform_name = transform_info['name']
+            
+            if transform_name == 'horizontal_flip':
+                # Flip x coordinates
+                yolo_boxes[:, 0] = 1.0 - yolo_boxes[:, 0]
+                
+            elif transform_name == 'rotation':
+                # Apply rotation based on angle
+                angle = transform_info['angle']
+                
+                if angle == 90:
+                    # Rotate 90 degrees clockwise
+                    x_center = yolo_boxes[:, 0]
+                    y_center = yolo_boxes[:, 1]
+                    width = yolo_boxes[:, 2]
+                    height = yolo_boxes[:, 3]
+                    
+                    new_x_center = y_center
+                    new_y_center = 1.0 - x_center
+                    new_width = height
+                    new_height = width
+                    
+                    yolo_boxes[:, 0] = new_x_center
+                    yolo_boxes[:, 1] = new_y_center
+                    yolo_boxes[:, 2] = new_width
+                    yolo_boxes[:, 3] = new_height
+                    
+                elif angle == 180:
+                    # Rotate 180 degrees
+                    yolo_boxes[:, 0] = 1.0 - yolo_boxes[:, 0]
+                    yolo_boxes[:, 1] = 1.0 - yolo_boxes[:, 1]
+                    
+                elif angle == 270:
+                    # Rotate 270 degrees clockwise (90 degrees counter-clockwise)
+                    x_center = yolo_boxes[:, 0]
+                    y_center = yolo_boxes[:, 1]
+                    width = yolo_boxes[:, 2]
+                    height = yolo_boxes[:, 3]
+                    
+                    new_x_center = 1.0 - y_center
+                    new_y_center = x_center
+                    new_width = height
+                    new_height = width
+                    
+                    yolo_boxes[:, 0] = new_x_center
+                    yolo_boxes[:, 1] = new_y_center
+                    yolo_boxes[:, 2] = new_width
+                    yolo_boxes[:, 3] = new_height
+                
+                # angle == 0 means no rotation, so no changes needed
+        
+        # Convert back to absolute coordinates for the original image
+        corrected_boxes = []
+        for box in yolo_boxes:
+            x_center, y_center, width, height = box
+            x1 = (x_center - width/2) * orig_width
+            y1 = (y_center - height/2) * orig_height
+            x2 = (x_center + width/2) * orig_width
+            y2 = (y_center + height/2) * orig_height
+            corrected_boxes.append([x1, y1, x2, y2])
+        
+        return np.array(corrected_boxes)
     
     def predict_image_from_array(self, image: np.ndarray) -> Dict:
         """
