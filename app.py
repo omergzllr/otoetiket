@@ -13,10 +13,14 @@ import traceback
 import yaml
 import yaml
 import random
+import json
 
 from utils.model_loader import ModelLoader
 from utils.predictor import Predictor
 from utils.augmentor import Augmentor
+
+
+print("deneme commit")
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max file size
@@ -470,7 +474,7 @@ def index():
             # Calculate results
             avg_confidence = total_confidence / processed_images if processed_images > 0 else 0.0
             
-            # After loop, store results and file paths in session
+            # After loop, store results and file paths in session (reduced data to prevent cookie overflow)
             session['results'] = {
                 'total_images': int(total_images_to_label),
                 'processed_images': int(processed_images),
@@ -480,10 +484,18 @@ def index():
                 'confidence_threshold': float(confidence_threshold),
                 'detection_stats': detection_stats,
                 'performance_results': performance_results if 'performance_results' in locals() else {},
-                'processed_files': processed_files_list  # Add this list to the session
+                # Store only file counts instead of full paths to reduce session size
+                'original_files_count': len([f for f in processed_files_list if 'original' in f['label_path']]),
+                'augmented_files_count': len([f for f in processed_files_list if 'augmented' in f['label_path']])
             }
             # Store unique class names in session
             session['class_names'] = sorted(list(all_class_names))
+            
+            # Store processed files list in a temporary file instead of session
+            temp_file_path = os.path.join(app.config['OUTPUT_FOLDER'], f'processed_files_{session_id}.json')
+            with open(temp_file_path, 'w') as f:
+                json.dump(processed_files_list, f)
+            session['processed_files_temp'] = temp_file_path
             
             print(f"\n=== PROCESSING COMPLETE ===")
             print(f"Results: {session['results']}")
@@ -503,7 +515,16 @@ def index():
 
 @app.route('/clear_session', methods=['POST'])
 def clear_session():
-    """Clear all session data"""
+    """Clear all session data and temporary files"""
+    # Clean up temporary files
+    if 'processed_files_temp' in session:
+        temp_file = session['processed_files_temp']
+        if os.path.exists(temp_file):
+            try:
+                os.remove(temp_file)
+            except:
+                pass  # Ignore errors if file can't be deleted
+    
     session.clear()
     return redirect(url_for('index'))
 
@@ -899,10 +920,17 @@ def create_split_dataset_route():
             'test': float(data.get('test', 20)) / 100
         }
 
-        if 'results' not in session or not session['results'].get('processed_files'):
+        if 'results' not in session or 'processed_files_temp' not in session:
             return jsonify({'error': 'No processed data found in session. Please process images first.'}), 404
 
-        processed_files = session['results']['processed_files']
+        # Load processed files from temporary file
+        temp_file_path = session['processed_files_temp']
+        if not os.path.exists(temp_file_path):
+            return jsonify({'error': 'Processed files data not found. Please process images first.'}), 404
+            
+        with open(temp_file_path, 'r') as f:
+            processed_files = json.load(f)
+        
         image_paths = [item['image_path'] for item in processed_files]
         label_paths = [item['label_path'] for item in processed_files]
         
