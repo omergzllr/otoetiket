@@ -1,0 +1,26 @@
+{
+  "original_shape": [
+    480,
+    640,
+    3
+  ],
+  "applied_transforms": [
+    {
+      "name": "rotation",
+      "angle": 90
+    },
+    {
+      "name": "blur",
+      "applied": true
+    }
+  ],
+  "transform_sequence": [
+    "rotation90",
+    "blur"
+  ],
+  "final_shape": [
+    640,
+    480,
+    3
+  ]
+}

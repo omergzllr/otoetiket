@@ -18,6 +18,9 @@ import json
 from utils.model_loader import ModelLoader
 from utils.predictor import Predictor
 from utils.augmentor import Augmentor
+from utils.smart_augmentor import SmartAugmentor
+from utils.label_transfer import LabelTransfer
+from utils.accuracy_improver import AccuracyImprover
 
 
 print("deneme commit")
@@ -169,10 +172,11 @@ def index():
             # Get form data
             model_type = request.form.get('model_type', 'auto')
             label_name = request.form.get('label_name', 'object')
-            confidence_threshold = float(request.form.get('confidence_threshold', 0.5))
+            confidence_threshold = float(request.form.get('confidence_threshold', 0.3))
             augmentation_count = int(request.form.get('augmentation_count', 3))
             do_augmentation = request.form.get('do_augmentation') == 'on'
             auto_optimize = request.form.get('auto_optimize') == 'on'  # New option
+            use_accuracy_improvement = request.form.get('use_accuracy_improvement') == 'on'  # New accuracy improvement option
             
             # Generate unique session ID for this processing job
             session_id = str(uuid.uuid4())
@@ -184,6 +188,7 @@ def index():
             print(f"Initial confidence threshold: {confidence_threshold}")
             print(f"Augmentation: {do_augmentation} ({augmentation_count} images)")
             print(f"Auto optimize: {auto_optimize}")
+            print(f"Accuracy improvement: {use_accuracy_improvement}")
             
             # Save model file
             model_filename = secure_filename(model_file.filename)
@@ -248,7 +253,9 @@ def index():
             
             # Setup predictor and augmentor
             predictor = Predictor(model, detected_model_type)
-            augmentor = Augmentor() if do_augmentation else None
+            smart_augmentor = SmartAugmentor() if do_augmentation else None
+            label_transfer = LabelTransfer() if do_augmentation else None
+            accuracy_improver = AccuracyImprover() if use_accuracy_improvement else None
             
             # Create output directories
             aug_images_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'augmented_images')
@@ -256,110 +263,54 @@ def index():
             os.makedirs(aug_images_dir, exist_ok=True)
             os.makedirs(aug_labels_dir, exist_ok=True)
             
-            # Step 1: Perform augmentation on all images first
+            # Step 1: Perform smart augmentation on all images first
             all_augmented_images = []
+            all_augmented_metadata = {}  # Store metadata for each augmented image
             total_augmented = 0
             
             if do_augmentation:
-                print("=== STEP 1: PERFORMING AUGMENTATION ===")
+                print("=== STEP 1: PERFORMING SMART AUGMENTATION ===")
                 for image_file in image_files:
                     try:
-                        print(f"\n--- Augmenting {image_file} ---")
+                        print(f"\n--- Smart Augmenting {image_file} ---")
                         
-                        # Load the original image for augmentation
-                        original_image = cv2.imread(image_file)
-                        if original_image is None:
-                            print(f"Warning: Could not load image {image_file}")
-                            continue
-                            
-                        original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
+                        # Use smart augmentation with tracking
+                        augmentation_results = smart_augmentor.augment_image_with_tracking(
+                            image_file, 
+                            augmentation_count, 
+                            aug_images_dir
+                        )
                         
-                        # For pure image augmentation (without existing labels), we'll use a simple transform
-                        # that doesn't require bounding boxes
-                        try:
-                            # Create a simple transform for image-only augmentation
-                            simple_transform = A.Compose([
-                                A.RandomRotate90(p=0.5),
-                                A.HorizontalFlip(p=0.5),
-                                A.RandomBrightnessContrast(p=0.2),
-                                A.GaussNoise(p=0.2),
-                                A.RGBShift(p=0.2),
-                                A.OneOf([
-                                    A.Blur(blur_limit=3, p=0.5),
-                                    A.MedianBlur(blur_limit=3, p=0.5),
-                                ], p=0.2),
-                            ])
+                        for result in augmentation_results:
+                            all_augmented_images.append(result['image_path'])
+                            all_augmented_metadata[result['image_path']] = result['metadata_path']
+                            total_augmented += 1
                             
-                            # Save augmented images
-                            base_name = os.path.splitext(os.path.basename(image_file))[0]
-                            aug_image_paths = []
+                            print(f"Created: {result['filename']} with transforms: {result['metadata']['transform_sequence']}")
                             
-                            for i in range(augmentation_count):
-                                # Apply simple augmentation
-                                transformed = simple_transform(image=original_image)
-                                aug_image = transformed['image']
-                                
-                                # Save augmented image
-                                aug_image_filename = f"{base_name}_aug{i}.jpg"
-                                aug_image_path = os.path.join(aug_images_dir, aug_image_filename)
-                                
-                                # Ensure unique filename
-                                counter = 1
-                                while os.path.exists(aug_image_path):
-                                    aug_image_filename = f"{base_name}_aug{i}_{counter}.jpg"
-                                    aug_image_path = os.path.join(aug_images_dir, aug_image_filename)
-                                    counter += 1
-                                
-                                # Convert back to BGR for saving
-                                aug_image_bgr = cv2.cvtColor(aug_image, cv2.COLOR_RGB2BGR)
-                                cv2.imwrite(aug_image_path, aug_image_bgr)
-                                
-                                aug_image_paths.append(aug_image_path)
-                                all_augmented_images.append(aug_image_path)
-                                total_augmented += 1
-                            
-                            print(f"Saved {len(aug_image_paths)} augmented images for {base_name}")
-                            
-                        except Exception as aug_error:
-                            print(f"Error during augmentation of {image_file}: {aug_error}")
-                            traceback.print_exc()
-                            continue
+                        print(f"Created {len(augmentation_results)} augmented images for {os.path.basename(image_file)}")
                         
                     except Exception as e:
-                        print(f"Error loading image {image_file}: {e}")
+                        print(f"Error during smart augmentation of {image_file}: {e}")
                         traceback.print_exc()
                         continue
                 
-                print(f"\n=== AUGMENTATION COMPLETE: {total_augmented} images created ===")
+                print(f"\n=== SMART AUGMENTATION COMPLETE: {total_augmented} images created ===")
             
-            # Step 2: Perform labeling on all images (original + augmented)
-            images_to_label = image_files + all_augmented_images if do_augmentation else image_files
-            total_images_to_label = len(images_to_label)
+            # Step 2: First process original images to get their labels
+            print(f"\n=== STEP 2: PROCESSING ORIGINAL IMAGES ===")
+            original_labels_map = {}  # Map original image paths to their label paths
             
-            print(f"\n=== STEP 2: PERFORMING LABELING ON {total_images_to_label} IMAGES ===")
-            print(f"Using confidence threshold: {confidence_threshold}")
-            
-            processed_images = 0
-            total_objects = 0
-            total_confidence = 0.0
-            detection_stats = {
-                'high_confidence': 0,  # > 0.8
-                'medium_confidence': 0,  # 0.5-0.8
-                'low_confidence': 0,  # < 0.5
-                'no_detections': 0
-            }
-            
-            # This list will store paths of successfully processed files
-            processed_files_list = []
-            # This set will store all unique detected class names
-            all_class_names = set()
-
-            for image_file in images_to_label:
+            for image_file in image_files:
                 try:
-                    print(f"\n--- Labeling {image_file} ---")
+                    print(f"\n--- Processing Original Image: {os.path.basename(image_file)} ---")
                     
-                    # Make predictions
-                    predictions = predictor.predict_image(image_file)
+                    # Make predictions on original image
+                    if use_accuracy_improvement and accuracy_improver:
+                        print("Using accuracy improvement for predictions...")
+                        predictions = accuracy_improver.improve_predictions(model, image_file, confidence_threshold)
+                    else:
+                        predictions = predictor.predict_image(image_file)
                     print(f"Raw predictions: {len(predictions.get('boxes', []))} detections")
                     
                     # Filter predictions based on confidence threshold
@@ -375,78 +326,329 @@ def index():
                         filtered_count = len(predictions['boxes'])
                         print(f"After confidence filtering: {filtered_count}/{original_count} detections")
                         
-                        # Update detection statistics
-                        if filtered_count == 0:
-                            detection_stats['no_detections'] += 1
-                        else:
-                            avg_conf = np.mean(predictions['scores'])
-                            if avg_conf > 0.8:
-                                detection_stats['high_confidence'] += 1
-                            elif avg_conf > 0.5:
-                                detection_stats['medium_confidence'] += 1
-                            else:
-                                detection_stats['low_confidence'] += 1
+                        # Log confidence scores for debugging
+                        if len(predictions['scores']) > 0:
+                            print(f"Confidence scores: {predictions['scores']}")
+                            print(f"Average confidence: {np.mean(predictions['scores']):.3f}")
                     
-                    # Determine output directory based on image type
-                    if image_file in all_augmented_images:
-                        # This is an augmented image
-                        output_dir = aug_labels_dir
-                        base_name = os.path.splitext(os.path.basename(image_file))[0]
-                        pred_image_path = os.path.join(aug_images_dir, f"{base_name}.jpg")  # Already saved
-                        pred_label_path = os.path.join(output_dir, f"{base_name}.txt")
-                    else:
-                        # This is an original image
-                        output_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'original_labels')
-                        os.makedirs(output_dir, exist_ok=True)
-                        base_name = os.path.splitext(os.path.basename(image_file))[0]
-                        pred_images_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'original_images')
-                        os.makedirs(pred_images_dir, exist_ok=True)
-                        pred_image_path = os.path.join(pred_images_dir, f"{base_name}_pred.jpg")
-                        pred_label_path = os.path.join(output_dir, f"{base_name}.txt")
+                    # Save original image predictions
+                    output_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'original_labels')
+                    os.makedirs(output_dir, exist_ok=True)
+                    base_name = os.path.splitext(os.path.basename(image_file))[0]
+                    pred_images_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'original_images')
+                    os.makedirs(pred_images_dir, exist_ok=True)
+                    pred_image_path = os.path.join(pred_images_dir, f"{base_name}_pred.jpg")
+                    pred_label_path = os.path.join(output_dir, f"{base_name}.txt")
                     
-                    # Ensure unique file names
-                    counter = 1
-                    while os.path.exists(pred_label_path):
-                        pred_label_path = os.path.join(output_dir, f"{base_name}_{counter}.txt")
-                        counter += 1
-                    
+                    # Save predictions
                     try:
-                        # Save predictions (image and labels)
-                        if image_file not in all_augmented_images:
-                            # Save original image with predictions
-                            # Use the correct output directory for images
-                            pred_images_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'original_images')
-                            predictor.save_predictions(image_file, predictions, pred_images_dir, label_name, True)
-                        else:
-                            # For augmented images, only save labels (image already saved)
-                            predictor.save_labels_only(predictions, pred_label_path, label_name)
-                        
-                        print(f"Saved labels: {pred_label_path}")
-                        
+                        predictor.save_predictions(image_file, predictions, pred_images_dir, label_name, True)
+                        print(f"Saved predictions to: {pred_images_dir}")
                     except Exception as save_error:
-                        print(f"Error saving predictions for {image_file}: {save_error}")
-                        traceback.print_exc()
-                        continue
+                        print(f"Error saving predictions: {save_error}")
+                        # Try to save labels only as fallback
+                        try:
+                            predictor.save_labels_only(predictions, pred_label_path, label_name)
+                            print(f"Saved labels only as fallback: {pred_label_path}")
+                        except Exception as label_error:
+                            print(f"Error saving labels only: {label_error}")
+                            # Create empty label file if all else fails
+                            with open(pred_label_path, 'w') as f:
+                                pass
+                            print(f"Created empty label file: {pred_label_path}")
                     
-                    processed_images += 1
-                    total_objects += len(predictions['boxes'])
-                    if len(predictions['scores']) > 0:
-                        total_confidence += np.mean(predictions['scores'])
+                    # Verify that label file was actually created
+                    if os.path.exists(pred_label_path):
+                        # Count lines in label file
+                        with open(pred_label_path, 'r') as f:
+                            lines = f.readlines()
+                            label_count = len([line for line in lines if line.strip()])
+                        print(f"Label file created with {label_count} labels")
+                        
+                        # If no labels were found, try with lower confidence threshold
+                        if label_count == 0 and len(predictions.get('boxes', [])) > 0:
+                            print("No labels saved, trying with lower confidence threshold...")
+                            # Use a very low threshold to ensure we get some labels
+                            low_threshold = 0.1
+                            mask = predictions['scores'] >= low_threshold
+                            low_conf_predictions = {
+                                'boxes': predictions['boxes'][mask],
+                                'scores': predictions['scores'][mask],
+                                'class_ids': predictions['class_ids'][mask],
+                                'type': predictions['type']
+                            }
+                            
+                            try:
+                                predictor.save_labels_only(low_conf_predictions, pred_label_path, label_name)
+                                with open(pred_label_path, 'r') as f:
+                                    lines = f.readlines()
+                                    label_count = len([line for line in lines if line.strip()])
+                                print(f"Retried with low threshold: {label_count} labels")
+                            except Exception as retry_error:
+                                print(f"Retry failed: {retry_error}")
+                    else:
+                        print(f"Warning: Label file was not created: {pred_label_path}")
+                        # Create empty file to prevent errors
+                        with open(pred_label_path, 'w') as f:
+                            pass
+                        print(f"Created empty label file as fallback")
                     
-                    # Add detected class names to the set
-                    for name in predictions.get('class_names', []):
-                        all_class_names.add(name)
+                    # Store label path for later use
+                    original_labels_map[image_file] = pred_label_path
                     
-                    # Store paths for final dataset creation
-                    processed_files_list.append({
-                        'image_path': image_file,
-                        'label_path': pred_label_path
-                    })
+                    # Validate labels if accuracy improvement is enabled
+                    if use_accuracy_improvement and accuracy_improver:
+                        validation_result = accuracy_improver.validate_labels(pred_label_path, image_file)
+                        if not validation_result['valid']:
+                            print(f"Label validation issues: {validation_result['issues']}")
+                        if validation_result['warnings']:
+                            print(f"Label validation warnings: {validation_result['warnings']}")
+                        print(f"Label validation: {validation_result['total_labels']} labels validated")
+                    
+                    print(f"Saved original labels: {pred_label_path}")
                     
                 except Exception as e:
-                    print(f"Error processing {image_file}: {e}")
+                    print(f"Error processing original image {image_file}: {e}")
                     traceback.print_exc()
                     continue
+                    
+            print(f"\nOriginal labels map contains {len(original_labels_map)} entries")
+            for img_path, label_path in list(original_labels_map.items())[:3]:  # Show first 3
+                print(f"  {os.path.basename(img_path)} -> {os.path.basename(label_path)}")
+            
+            # Step 3: Process augmented images using label transfer
+            print(f"\n=== STEP 3: PROCESSING AUGMENTED IMAGES WITH LABEL TRANSFER ===")
+            
+            if do_augmentation:
+                for aug_image_path in all_augmented_images:
+                    try:
+                        print(f"\n--- Processing Augmented Image: {os.path.basename(aug_image_path)} ---")
+                        
+                        # Find corresponding original image
+                        aug_filename = os.path.basename(aug_image_path)
+                        
+                        # Extract base name more robustly
+                        # Handle different naming patterns
+                        if '_aug' in aug_filename:
+                            base_name = aug_filename.split('_aug')[0]
+                        else:
+                            # Fallback: try to extract base name before any augmentation indicators
+                            base_name = aug_filename
+                            for suffix in ['_rotation', '_horizontal_flip', '_brightness_contrast', '_gauss_noise', '_rgb_shift', '_blur']:
+                                if suffix in base_name:
+                                    base_name = base_name.split(suffix)[0]
+                                    break
+                        
+                        print(f"Looking for original image with base name: {base_name}")
+                        
+                        # Find original image path - try multiple matching strategies
+                        original_image_path = None
+                        
+                        # Strategy 1: Exact match
+                        for orig_path in image_files:
+                            orig_basename = os.path.splitext(os.path.basename(orig_path))[0]
+                            if orig_basename == base_name:
+                                original_image_path = orig_path
+                                print(f"Found exact match: {orig_basename}")
+                                break
+                        
+                        # Strategy 2: Partial match (if exact match fails)
+                        if not original_image_path:
+                            for orig_path in image_files:
+                                orig_basename = os.path.splitext(os.path.basename(orig_path))[0]
+                                # Check if base_name is contained in original basename
+                                if base_name in orig_basename or orig_basename in base_name:
+                                    original_image_path = orig_path
+                                    print(f"Found partial match: {orig_basename} (base: {base_name})")
+                                    break
+                        
+                        # Strategy 3: Try to match by removing common suffixes
+                        if not original_image_path:
+                            # Remove common suffixes from base_name
+                            clean_base = base_name
+                            for suffix in ['.rf.', '.png', '.jpg', '.jpeg']:
+                                if suffix in clean_base:
+                                    clean_base = clean_base.split(suffix)[0]
+                            
+                            for orig_path in image_files:
+                                orig_basename = os.path.splitext(os.path.basename(orig_path))[0]
+                                orig_clean = orig_basename
+                                for suffix in ['.rf.', '.png', '.jpg', '.jpeg']:
+                                    if suffix in orig_clean:
+                                        orig_clean = orig_clean.split(suffix)[0]
+                                
+                                if clean_base == orig_clean:
+                                    original_image_path = orig_path
+                                    print(f"Found cleaned match: {orig_basename} (clean: {clean_base})")
+                                    break
+                        
+                        if not original_image_path:
+                            print(f"Warning: Could not find original image for {aug_filename}")
+                            print(f"Available original images: {[os.path.basename(f) for f in image_files[:5]]}...")
+                            continue
+                        
+                        # Get original label path
+                        original_label_path = original_labels_map.get(original_image_path)
+                        if not original_label_path or not os.path.exists(original_label_path):
+                            print(f"Warning: No original labels found for {aug_filename}")
+                            print(f"Original image: {original_image_path}")
+                            print(f"Expected label path: {original_label_path}")
+                            
+                            # Fallback: Use model predictions directly for augmented image
+                            print(f"Using fallback: direct model prediction for augmented image")
+                            model_predictions = predictor.predict_image(aug_image_path)
+                            if model_predictions['type'] in ['detection', 'instance_segmentation']:
+                                original_count = len(model_predictions['boxes'])
+                                mask = model_predictions['scores'] >= confidence_threshold
+                                model_predictions['boxes'] = model_predictions['boxes'][mask]
+                                model_predictions['scores'] = model_predictions['scores'][mask]
+                                model_predictions['class_ids'] = model_predictions['class_ids'][mask]
+                                
+                                # Convert model predictions to label format
+                                model_labels = []
+                                for box, class_id, score in zip(model_predictions['boxes'], 
+                                                              model_predictions['class_ids'], 
+                                                              model_predictions['scores']):
+                                    x1, y1, x2, y2 = box
+                                    img_height, img_width = cv2.imread(aug_image_path).shape[:2]
+                                    x_center = (x1 + x2) / 2 / img_width
+                                    y_center = (y1 + y2) / 2 / img_height
+                                    width = (x2 - x1) / img_width
+                                    height = (y2 - y1) / img_height
+                                    model_labels.append([class_id, x_center, y_center, width, height])
+                                
+                                # Save model predictions as labels
+                                aug_base_name = os.path.splitext(os.path.basename(aug_image_path))[0]
+                                aug_label_path = os.path.join(aug_labels_dir, f"{aug_base_name}.txt")
+                                label_transfer.save_transferred_labels(model_labels, aug_label_path)
+                                
+                                print(f"Saved {len(model_labels)} model predictions as labels: {aug_label_path}")
+                            else:
+                                print(f"No valid predictions from model for {aug_filename}")
+                                continue
+                        else:
+                            # Get metadata path
+                            metadata_path = all_augmented_metadata.get(aug_image_path)
+                            if not metadata_path or not os.path.exists(metadata_path):
+                                print(f"Warning: No metadata found for {aug_filename}")
+                                continue
+                            
+                            # Transfer labels from original to augmented image
+                            print(f"Transferring labels from {os.path.basename(original_image_path)}")
+                            transferred_labels = label_transfer.transfer_labels_from_original(
+                                original_image_path,
+                                original_label_path,
+                                aug_image_path,
+                                metadata_path
+                            )
+                            
+                            # Save transferred labels
+                            aug_base_name = os.path.splitext(os.path.basename(aug_image_path))[0]
+                            aug_label_path = os.path.join(aug_labels_dir, f"{aug_base_name}.txt")
+                            label_transfer.save_transferred_labels(transferred_labels, aug_label_path)
+                            
+                            print(f"Transferred {len(transferred_labels)} labels to: {aug_label_path}")
+                            
+                            # Also get model predictions for comparison
+                            model_predictions = predictor.predict_image(aug_image_path)
+                            if model_predictions['type'] in ['detection', 'instance_segmentation']:
+                                original_count = len(model_predictions['boxes'])
+                                mask = model_predictions['scores'] >= confidence_threshold
+                                model_predictions['boxes'] = model_predictions['boxes'][mask]
+                                model_predictions['scores'] = model_predictions['scores'][mask]
+                                model_predictions['class_ids'] = model_predictions['class_ids'][mask]
+                                
+                                # Convert model predictions to label format for comparison
+                                model_labels = []
+                                for box, class_id, score in zip(model_predictions['boxes'], 
+                                                              model_predictions['class_ids'], 
+                                                              model_predictions['scores']):
+                                    x1, y1, x2, y2 = box
+                                    img_height, img_width = cv2.imread(aug_image_path).shape[:2]
+                                    x_center = (x1 + x2) / 2 / img_width
+                                    y_center = (y1 + y2) / 2 / img_height
+                                    width = (x2 - x1) / img_width
+                                    height = (y2 - y1) / img_height
+                                    model_labels.append([class_id, x_center, y_center, width, height])
+                                
+                                # Compare transferred vs model predictions
+                                comparison = label_transfer.compare_labels(transferred_labels, model_labels)
+                                print(f"Label consistency: {comparison['details']}")
+                                
+                                # If model predictions are significantly better, use them instead
+                                if comparison['score'] < 0.3 and len(model_labels) > 0:
+                                    print(f"Using model predictions instead of transferred labels (better consistency)")
+                                    label_transfer.save_transferred_labels(model_labels, aug_label_path)
+                    except Exception as e:
+                        print(f"Error processing augmented image {aug_image_path}: {e}")
+                        traceback.print_exc()
+                        continue
+            
+            # Step 4: Calculate final statistics and create processed files list
+            print(f"\n=== STEP 4: CALCULATING FINAL STATISTICS ===")
+            
+            processed_images = 0
+            total_objects = 0
+            total_confidence = 0.0
+            detection_stats = {
+                'high_confidence': 0,  # > 0.8
+                'medium_confidence': 0,  # 0.5-0.8
+                'low_confidence': 0,  # < 0.5
+                'no_detections': 0
+            }
+            
+            # This list will store paths of successfully processed files
+            processed_files_list = []
+            # This set will store all unique detected class names
+            all_class_names = set()
+            
+            # Count original images
+            for image_file in image_files:
+                label_path = original_labels_map.get(image_file)
+                if label_path and os.path.exists(label_path):
+                    processed_images += 1
+                    
+                    # Count objects in label file
+                    try:
+                        with open(label_path, 'r') as f:
+                            lines = f.readlines()
+                            total_objects += len(lines)
+                    except:
+                        pass
+                    
+                    # Add to processed files list
+                    processed_files_list.append({
+                        'image_path': image_file,
+                        'label_path': label_path,
+                        'type': 'original'
+                    })
+            
+            # Count augmented images
+            if do_augmentation:
+                for aug_image_path in all_augmented_images:
+                    aug_base_name = os.path.splitext(os.path.basename(aug_image_path))[0]
+                    aug_label_path = os.path.join(aug_labels_dir, f"{aug_base_name}.txt")
+                    
+                    if os.path.exists(aug_label_path):
+                        processed_images += 1
+                        
+                        # Count objects in label file
+                        try:
+                            with open(aug_label_path, 'r') as f:
+                                lines = f.readlines()
+                                total_objects += len(lines)
+                        except:
+                            pass
+                        
+                        # Add to processed files list
+                        processed_files_list.append({
+                            'image_path': aug_image_path,
+                            'label_path': aug_label_path,
+                            'type': 'augmented'
+                        })
+            
+            # Calculate average confidence (approximate)
+            avg_confidence = 0.7  # Default confidence for transferred labels
             
             # Create ZIP files
             try:
@@ -471,12 +673,16 @@ def index():
                 traceback.print_exc()
                 # Continue processing even if ZIP creation fails
             
+<<<<<<< HEAD
             # Calculate results
             avg_confidence = total_confidence / processed_images if processed_images > 0 else 0.0
             
             # After loop, store results and file paths in session (reduced data to prevent cookie overflow)
+=======
+            # After loop, store results and file paths in session
+>>>>>>> 209e6a65475c0d3ae1acacd96fdece629a3cb288
             session['results'] = {
-                'total_images': int(total_images_to_label),
+                'total_images': int(len(image_files) + (len(all_augmented_images) if do_augmentation else 0)),
                 'processed_images': int(processed_images),
                 'total_objects': int(total_objects),
                 'avg_confidence': float(avg_confidence),

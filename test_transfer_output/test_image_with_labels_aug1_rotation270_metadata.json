@@ -1,0 +1,21 @@
+{
+  "original_shape": [
+    480,
+    640,
+    3
+  ],
+  "applied_transforms": [
+    {
+      "name": "rotation",
+      "angle": 270
+    }
+  ],
+  "transform_sequence": [
+    "rotation270"
+  ],
+  "final_shape": [
+    640,
+    480,
+    3
+  ]
+}
